@@ -1,0 +1,28 @@
+
+menuconfig MCUBOOT_BLE
+    bool "MCUboot BLE DFU"
+    default n
+
+
+if MCUBOOT_BLE
+
+menu "Entrance methods"
+
+menuconfig BOOT_BLE_DFU_ENTRANCE_GPIO
+	bool "GPIO"
+	default y
+	depends on GPIO
+	help
+	  Use a GPIO to enter ble dfu mode
+
+config BOOT_BLE_DFU_DETECT_DELAY
+	int "BLE detect pin detection delay time [ms]"
+	default 0
+	depends on BOOT_BLE_DFU_ENTRANCE_GPIO
+	help
+	  Used to prevent the bootloader from loading on button press.
+	  Useful for powering on when using the same button as
+	  the one used to place the device in bootloader mode.
+endmenu
+
+endif

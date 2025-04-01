@@ -30,6 +30,8 @@
 #include "target.h"
 #include "bootutil/bootutil_log.h"
 
+BOOT_LOG_MODULE_DECLARE(mcuboot);
+
 #if defined(CONFIG_BOOT_SERIAL_PIN_RESET) || defined(CONFIG_BOOT_FIRMWARE_LOADER_PIN_RESET)
 #include <zephyr/drivers/hwinfo.h>
 #endif
@@ -58,6 +60,9 @@
 #error "Firmware loader selected without an entrance mode set"
 #endif
 #endif
+
+/* Validate ble dfu configuration */
+
 
 #ifdef CONFIG_MCUBOOT_INDICATION_LED
 
@@ -99,12 +104,14 @@ void io_led_set(int value)
 #endif /* CONFIG_MCUBOOT_INDICATION_LED */
 
 #if defined(CONFIG_BOOT_SERIAL_ENTRANCE_GPIO) || defined(CONFIG_BOOT_USB_DFU_GPIO) || \
-    defined(CONFIG_BOOT_FIRMWARE_LOADER_ENTRANCE_GPIO)
+    defined(CONFIG_BOOT_FIRMWARE_LOADER_ENTRANCE_GPIO) || defined(CONFIG_BOOT_BLE_DFU_ENTRANCE_GPIO)
 
 #if defined(CONFIG_MCUBOOT_SERIAL)
 #define BUTTON_0_DETECT_DELAY CONFIG_BOOT_SERIAL_DETECT_DELAY
 #elif defined(CONFIG_BOOT_FIRMWARE_LOADER)
 #define BUTTON_0_DETECT_DELAY CONFIG_BOOT_FIRMWARE_LOADER_DETECT_DELAY
+#elif defined(CONFIG_MCUBOOT_BLE)
+#define BUTTON_0_DETECT_DELAY CONFIG_BOOT_BLE_DFU_DETECT_DELAY
 #else
 #define BUTTON_0_DETECT_DELAY CONFIG_BOOT_USB_DFU_DETECT_DELAY
 #endif

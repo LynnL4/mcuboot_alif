@@ -273,6 +273,10 @@ if(CONFIG_MCUBOOT_SERIAL)
   endif()
 endif()
 
+if(CONFIG_MCUBOOT_BLE)
+  zephyr_sources(${BOOT_DIR}/zephyr/boot_ble.c)
+endif()
+
 if(NOT CONFIG_BOOT_SIGNATURE_KEY_FILE STREQUAL "")
   # CONF_FILE points to the KConfig configuration files of the bootloader.
   foreach (filepath ${CONF_FILE})
