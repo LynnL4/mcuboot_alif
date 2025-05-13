@@ -3,11 +3,11 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/sys/__assert.h>
+#include <zephyr/sys/reboot.h>
 #include <zephyr/drivers/flash.h>
 #include <zephyr/drivers/timer/system_timer.h>
 #include <zephyr/usb/usb_device.h>
 #include <soc.h>
-#include <zephyr/linker/linker-defs.h>
 
 #include "target.h"
 #include "bootutil/bootutil_log.h"
@@ -26,6 +26,10 @@ BOOT_LOG_MODULE_DECLARE(mcuboot);
 #include "gapm_le_adv.h"
 #include "co_endian.h"
 #include "gatt_db.h"
+
+#include "io/io.h"
+
+static char ble_name[BD_NAME_SIZE];
 
 /* Standard GATT 16 bit UUIDs must be extended to 128 bits when using gatt_att_desc_t */
 #define GATT_DECL_PRIMARY_SERVICE_UUID128     \
@@ -171,8 +175,8 @@ static uint16_t utils_create_adv_data(void)
     uint8_t adv_buf[GAP_ADV_DATA_LEN] = {0};
     uint16_t rc;
 
-    rc = utils_add_ltv_field(adv_buf, &adv_len, GAP_AD_TYPE_COMPLETE_NAME, CONFIG_BOARD,
-                             strlen(CONFIG_BOARD));
+    rc = utils_add_ltv_field(adv_buf, &adv_len, GAP_AD_TYPE_COMPLETE_NAME, ble_name,
+                             strlen(ble_name));
     if (rc != GAP_ERR_NO_ERROR)
     {
         return rc;
@@ -537,8 +541,8 @@ static uint16_t utils_create_adv(void)
         .max_tx_pwr = 0,
         .filter_pol = GAPM_ADV_ALLOW_SCAN_ANY_CON_ANY,
         .prim_cfg = {
-            .adv_intv_min = 160,
-            .adv_intv_max = 800,
+            .adv_intv_min = 80,
+            .adv_intv_max = 400,
             .ch_map = ADV_ALL_CHNLS_EN,
             .phy = GAPM_PHY_TYPE_LE_1M,
         },
@@ -556,7 +560,7 @@ static uint16_t utils_create_adv(void)
 static void on_gapm_name_proc_cmp_cb(uint32_t metainfo, uint16_t status)
 {
     uint16_t rc;
-
+    BOOT_LOG_INF("GAPM name set callback");
     if (status != GAP_ERR_NO_ERROR)
     {
         BOOT_LOG_ERR("GAPM name set callback failed, error: %u", status);
@@ -588,8 +592,13 @@ static void on_gapm_process_complete(uint32_t metainfo, uint16_t status)
         return;
     }
 
-    BOOT_LOG_INF("Setting device name: %s", CONFIG_BOARD);
-    rc = gapm_set_name(0, strlen(CONFIG_BOARD), CONFIG_BOARD, on_gapm_name_proc_cmp_cb);
+    /* Get identity */
+    gap_bdaddr_t identity;
+    gapm_get_identity(&identity);
+
+    snprintf(ble_name, sizeof(ble_name), "Frame %02X", identity.addr[0]);
+    BOOT_LOG_INF("Setting ADV device name: %s", ble_name);
+    rc = gapm_set_name(0, strlen(ble_name), ble_name, on_gapm_name_proc_cmp_cb);
     if (rc != GAP_ERR_NO_ERROR)
     {
         BOOT_LOG_ERR("Failed to set device name, error: %u", rc);
@@ -795,8 +804,32 @@ void boot_ble_start(void)
         return;
     }
 
+    bool _reset_wait = false;
+    bool _reset = false;
     while (1)
     {
-        k_sleep(K_SECONDS(1));
+        k_sleep(K_MSEC(50));
+
+        if (io_detect_pin() == 0)
+        {
+            if (_reset)
+            {
+                BOOT_LOG_INF("Resetting device");
+                sys_reboot(SYS_REBOOT_COLD);
+            }
+            if (!_reset_wait)
+            {
+                BOOT_LOG_INF("Waiting for button to be pressed");
+                _reset_wait = true;
+            }
+        }
+        if (io_detect_pin() == 1)
+        {
+            if (_reset_wait)
+            {
+                BOOT_LOG_INF("Waiting for button to be released");
+                _reset = true;
+            }
+        }
     }
 }

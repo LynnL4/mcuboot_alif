@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "boot_serial.h": "c",
+        "bootutil_log.h": "c"
+    },
+    "cmake.sourceDirectory": "/home/lht/frame2/bootloader/mcuboot/boot/bootutil"
+}

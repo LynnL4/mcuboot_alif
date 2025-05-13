@@ -431,6 +431,12 @@ static void boot_ble_enter()
 }
 #endif
 
+#ifdef CONFIG_BOOT_DBL_TAP_REG
+#define BOOT_DBL_TAP_REG *(uint32_t *)CONFIG_BOOT_DBL_TAP_REG
+#define BOOT_DBL_TAP_MAGIC_QUICK_BOOT 0xc15bfa71
+#define BOOT_DBL_TAP_MAGIC_DFU 0x71fc1a5b
+#endif
+
 int main(void)
 {
     struct boot_rsp rsp;
@@ -459,6 +465,26 @@ int main(void)
 
     mcuboot_status_change(MCUBOOT_STATUS_STARTUP);
 
+#ifdef CONFIG_BOOT_DBL_TAP_REG
+    BOOT_LOG_HEXDUMP(BOOT_DBL_TAP_REG, sizeof(BOOT_DBL_TAP_REG), "BOOT_DBL_TAP_REG");
+    /* Check if we are in quick boot mode */
+    switch (BOOT_DBL_TAP_REG)
+    {
+    case BOOT_DBL_TAP_MAGIC_QUICK_BOOT:
+        BOOT_LOG_INF("Quick boot mode");
+        BOOT_DBL_TAP_REG = 0;
+        break;
+    case BOOT_DBL_TAP_MAGIC_DFU:
+        BOOT_LOG_INF("DFU mode");
+        BOOT_DBL_TAP_REG = 0;
+        break;
+    default:
+        break;
+    }
+
+    BOOT_DBL_TAP_REG = BOOT_DBL_TAP_MAGIC_DFU;
+
+#endif
 
 #ifdef CONFIG_MCUBOOT_BLE
     if (io_detect_pin())
@@ -566,6 +592,13 @@ int main(void)
          * recovery mode
          */
         boot_serial_enter();
+#endif
+
+#ifdef CONFIG_MCUBOOT_BLE
+        /* No bootable image and configuration set to remain in BLE DFU
+         * mode
+         */
+        boot_ble_enter();
 #endif
 
         FIH_PANIC;
