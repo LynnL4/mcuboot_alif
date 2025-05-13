@@ -31,6 +31,27 @@ BOOT_LOG_MODULE_DECLARE(mcuboot);
 
 static char ble_name[BD_NAME_SIZE];
 
+#define ALIF_IEEE_MA_L_IDENTIFIER (uint32_t)0x785994
+
+static void alif_eui48_read(uint8_t *eui48)
+{
+#ifdef ALIF_IEEE_MA_L_IDENTIFIER
+	eui48[0] = (uint8_t)(ALIF_IEEE_MA_L_IDENTIFIER >> 16);
+	eui48[1] = (uint8_t)(ALIF_IEEE_MA_L_IDENTIFIER >> 8);
+	eui48[2] = (uint8_t)(ALIF_IEEE_MA_L_IDENTIFIER);
+#else
+	se_service_get_rnd_num(&eui48[0], 3);
+	eui48[0] |= 0xC0;
+#endif
+	se_system_get_eui_extension(true, &eui48[3]);
+	if (eui48[3] || eui48[4] || eui48[5]) {
+		return;
+	}
+	/* Generate Random Local value (ELI) */
+	se_service_get_rnd_num(&eui48[3], 3);
+}
+
+
 /* Standard GATT 16 bit UUIDs must be extended to 128 bits when using gatt_att_desc_t */
 #define GATT_DECL_PRIMARY_SERVICE_UUID128     \
     {GATT_DECL_PRIMARY_SERVICE & 0xFF,        \
@@ -108,6 +129,7 @@ enum smp_gatt_id
 struct smp_environment
 {
     uint8_t conidx;
+    uint8_t eui48[6];
     uint8_t adv_actv_idx;
     uint16_t ntf_cfg;
     uint16_t start_hdl;
@@ -608,7 +630,12 @@ static void on_gapm_process_complete(uint32_t metainfo, uint16_t status)
 
 static uint16_t utils_config_gapm(void)
 {
-    static const gapm_config_t gapm_cfg = {
+
+    
+	// Get EUI48
+	alif_eui48_read(env.eui48);
+
+    static  gapm_config_t gapm_cfg = {
         .role = GAP_ROLE_LE_PERIPHERAL,
         .pairing_mode = GAPM_PAIRING_DISABLE,
         .pairing_min_req_key_size = 0,
@@ -628,6 +655,8 @@ static uint16_t utils_config_gapm(void)
         .class_of_device = 0,
         .dflt_link_policy = 0,
     };
+
+    memcpy(&gapm_cfg.private_identity.addr, env.eui48, sizeof(gapm_cfg.private_identity.addr));
 
     static const gapc_connection_req_cb_t gapc_con_cbs = {
         .le_connection_req = on_le_connection_req,
