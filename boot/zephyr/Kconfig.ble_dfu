@@ -23,6 +23,16 @@ config BOOT_BLE_DFU_DETECT_DELAY
 	  Used to prevent the bootloader from loading on button press.
 	  Useful for powering on when using the same button as
 	  the one used to place the device in bootloader mode.
+
+config BOOT_BLE_DFU_IDLE_TIMEOUT
+	int "BLE DFU idle timeout [ms]"
+	default 10
+	help
+	  Timeout duration (in milliseconds) for BLE DFU mode.
+	  If there is no user interaction or data exchange within this time,
+	  the system will automatically exit DFU mode.
+	  Set to 0 to disable timeout.
+
 endmenu
 
 endif

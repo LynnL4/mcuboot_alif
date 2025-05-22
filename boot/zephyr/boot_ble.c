@@ -29,6 +29,7 @@ BOOT_LOG_MODULE_DECLARE(mcuboot);
 
 #include "io/io.h"
 
+static uint32_t start_time = 0;
 static char ble_name[BD_NAME_SIZE];
 
 #define ALIF_IEEE_MA_L_IDENTIFIER (uint32_t)0x785994
@@ -36,21 +37,21 @@ static char ble_name[BD_NAME_SIZE];
 static void alif_eui48_read(uint8_t *eui48)
 {
 #ifdef ALIF_IEEE_MA_L_IDENTIFIER
-	eui48[0] = (uint8_t)(ALIF_IEEE_MA_L_IDENTIFIER >> 16);
-	eui48[1] = (uint8_t)(ALIF_IEEE_MA_L_IDENTIFIER >> 8);
-	eui48[2] = (uint8_t)(ALIF_IEEE_MA_L_IDENTIFIER);
+    eui48[0] = (uint8_t)(ALIF_IEEE_MA_L_IDENTIFIER >> 16);
+    eui48[1] = (uint8_t)(ALIF_IEEE_MA_L_IDENTIFIER >> 8);
+    eui48[2] = (uint8_t)(ALIF_IEEE_MA_L_IDENTIFIER);
 #else
-	se_service_get_rnd_num(&eui48[0], 3);
-	eui48[0] |= 0xC0;
+    se_service_get_rnd_num(&eui48[0], 3);
+    eui48[0] |= 0xC0;
 #endif
-	se_system_get_eui_extension(true, &eui48[3]);
-	if (eui48[3] || eui48[4] || eui48[5]) {
-		return;
-	}
-	/* Generate Random Local value (ELI) */
-	se_service_get_rnd_num(&eui48[3], 3);
+    se_system_get_eui_extension(true, &eui48[3]);
+    if (eui48[3] || eui48[4] || eui48[5])
+    {
+        return;
+    }
+    /* Generate Random Local value (ELI) */
+    se_service_get_rnd_num(&eui48[3], 3);
 }
-
 
 /* Standard GATT 16 bit UUIDs must be extended to 128 bits when using gatt_att_desc_t */
 #define GATT_DECL_PRIMARY_SERVICE_UUID128     \
@@ -370,6 +371,7 @@ static void on_ctrl_hw_error(enum co_error hw_err_code)
 
 static void on_cb_event_sent(uint8_t conidx, uint8_t user_lid, uint16_t metainfo, uint16_t status)
 {
+    start_time = k_uptime_get_32(); // reset the timeout timer
     if (status != GAP_ERR_NO_ERROR)
     {
         BOOT_LOG_ERR("Notification send callback failed, status: %u", status);
@@ -384,6 +386,8 @@ static void on_cb_att_read_get(uint8_t conidx, uint8_t user_lid, uint16_t token,
     uint16_t rc;
     co_buf_t *p_buf = NULL;
     uint16_t idx = hdl - env.start_hdl;
+
+    start_time = k_uptime_get_32(); // reset the timeout timer
 
     switch (idx)
     {
@@ -469,7 +473,7 @@ static void on_cb_att_val_set(uint8_t conidx, uint8_t user_lid, uint16_t token, 
 {
     uint16_t rc;
     uint16_t idx = hdl - env.start_hdl;
-
+    start_time = k_uptime_get_32(); // reset the timeout timer
     switch (idx)
     {
     case SMP_GATT_ID_VAL:
@@ -631,11 +635,10 @@ static void on_gapm_process_complete(uint32_t metainfo, uint16_t status)
 static uint16_t utils_config_gapm(void)
 {
 
-    
-	// Get EUI48
-	alif_eui48_read(env.eui48);
+    // Get EUI48
+    alif_eui48_read(env.eui48);
 
-    static  gapm_config_t gapm_cfg = {
+    static gapm_config_t gapm_cfg = {
         .role = GAP_ROLE_LE_PERIPHERAL,
         .pairing_mode = GAPM_PAIRING_DISABLE,
         .pairing_min_req_key_size = 0,
@@ -832,12 +835,18 @@ void boot_ble_start(void)
         BOOT_LOG_ERR("Failed to enable BLE, error: %i", rc);
         return;
     }
-
+    start_time = k_uptime_get_32();
     bool _reset_wait = false;
     bool _reset = false;
     while (1)
     {
         k_sleep(K_MSEC(50));
+
+        if (k_uptime_get_32() - start_time > CONFIG_BOOT_BLE_DFU_IDLE_TIMEOUT * 1000)
+        {
+            BOOT_LOG_INF("No activity detected for %u seconds, exiting DFU mode", CONFIG_BOOT_BLE_DFU_IDLE_TIMEOUT);
+            sys_reboot(SYS_REBOOT_COLD);
+        }
 
         if (io_detect_pin() == 0)
         {
