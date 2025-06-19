@@ -25,8 +25,8 @@ config BOOT_BLE_DFU_DETECT_DELAY
 	  the one used to place the device in bootloader mode.
 
 config BOOT_BLE_DFU_IDLE_TIMEOUT
-	int "BLE DFU idle timeout [ms]"
-	default 10
+	int "BLE DFU idle timeout [s]"
+	default 30
 	help
 	  Timeout duration (in milliseconds) for BLE DFU mode.
 	  If there is no user interaction or data exchange within this time,

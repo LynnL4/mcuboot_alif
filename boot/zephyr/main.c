@@ -414,18 +414,14 @@ static void boot_serial_enter()
 #endif
 
 #ifdef CONFIG_MCUBOOT_BLE
-extern int boot_ble_init(void);
 extern void boot_ble_start(void);
 static void boot_ble_enter()
 {
-    int rc;
 #ifdef CONFIG_MCUBOOT_INDICATION_LED
     io_led_set(1);
 #endif
     mcuboot_status_change(MCUBOOT_STATUS_BLE_DFU_ENTERED);
     BOOT_LOG_INF("Enter the BLE DFU mode");
-    rc = boot_ble_init();
-    __ASSERT(rc == 0, "Error initializing boot BLE.\n");
     boot_ble_start();
     __ASSERT(0, "Bootloader BLE process was terminated unexpectedly.\n");
 }
@@ -486,7 +482,7 @@ int main(void)
 
 #endif
 
-#ifdef CONFIG_MCUBOOT_BLE
+#ifdef CONFIG_BOOT_BLE_DFU_ENTRANCE_GPIO
     if (io_detect_pin())
     {
         /* Boot mode to stay in bootloader, clear status and enter BLE DFU mode
