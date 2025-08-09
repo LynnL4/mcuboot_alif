@@ -38,13 +38,14 @@ void boot_ble_start(void)
     __ASSERT(filesystem_init() == 0, "filesystem_init failed");
     __ASSERT(le_init() == 0, "le_init failed");
     le_adv_start();
+
+#ifdef CONFIG_BOOT_BLE_DFU_ENTRANCE_GPIO
     uint32_t start_time = k_uptime_get_32();
     bool _reset_wait = false;
     bool _reset = false;
 
     while (1)
     {
-#ifdef CONFIG_BOOT_BLE_DFU_ENTRANCE_GPIO
         k_sleep(K_MSEC(50));
         if (le_is_connected())
         {
@@ -78,8 +79,11 @@ void boot_ble_start(void)
                 _reset = true;
             }
         }
-#else
-    k_sleep(K_MSEC(1000));
-#endif
     }
+#else
+    while (1)
+    {
+        k_sleep(K_MSEC(1000));
+    }
+#endif
 }
